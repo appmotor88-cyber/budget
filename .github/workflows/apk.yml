@@ -15,7 +15,7 @@ jobs:
           cp icon-192-4.png www/icon-192.png
           cp icon-512-4.png www/icon-512.png
           cp icon-maskable-512-2.png www/icon-maskable-512.png
-      - run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/local-notifications
+      - run: npm install --legacy-peer-deps @capacitor/core @capacitor/cli @capacitor/android @capacitor/local-notifications
       - run: npx cap add android && npx cap sync android
       - run: cd android && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
