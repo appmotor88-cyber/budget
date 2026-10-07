@@ -1,0 +1,24 @@
+name: apk
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: 21}
+      - run: |
+          mkdir www
+          cp index.html sw.js manifest.json www/
+          cp icon-192-4.png www/icon-192.png
+          cp icon-512-4.png www/icon-512.png
+          cp icon-maskable-512-2.png www/icon-maskable-512.png
+      - run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/local-notifications
+      - run: npx cap add android && npx cap sync android
+      - run: cd android && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: budget-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
