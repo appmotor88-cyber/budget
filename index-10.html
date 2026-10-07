@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>خرج روزانه</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e8b75c">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#0f1420;--card:#192030;--line:#273046;--ink:#eef1f7;--mute:#8a94a8;--gold:#e8b75c;--red:#ff7a7a;--green:#6fd3a0;--field:#0f1420;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root:not([data-theme="dark"]){color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Vazirmatn,Tahoma,system-ui,sans-serif;background-color:#0f1420}
+.wrap{max-width:560px;margin:0 auto;padding-bottom:40px}
+.hero{background:var(--gold);color:#241a05;padding:18px 20px 16px}
+.hero .row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.hero small{opacity:.8;display:block}
+.big{font-size:44px;font-weight:800;line-height:1.1;direction:ltr;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.15)}
+.bar{height:10px;border-radius:6px;background:rgba(255,255,255,.45);margin:14px 0 10px;overflow:hidden}
+.bar i{display:block;height:100%;background:#241a05;width:0}
+.note{font-weight:700;min-height:1.5em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;margin:16px 14px 0;padding:18px}
+h2{margin:0 0 12px;font-size:18px}
+.f{display:flex;gap:10px;margin-bottom:10px}
+input,select{flex:1;min-width:0;background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font:inherit}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+button{background:var(--gold);color:#241a05;border:0;border-radius:12px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}
+button.l{background:none;color:var(--mute);font-weight:400;padding:6px}
+.hint{color:var(--mute);font-size:13px;margin:0 0 6px}
+.r{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line)}
+.r b,.num{direction:ltr;unicode-bidi:isolate}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:0 8px;color:var(--mute);margin:0 8px}
+.neg{color:var(--red)}.pos{color:var(--green)}
+.it{flex:1;display:flex;align-items:center}
+.day{cursor:pointer}
+.day .s{color:var(--mute);font-size:13px}
+.empty{color:var(--mute);margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+var KEY='daily-budget-v1',TZ='Asia/Jakarta';
+var S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+S=S||{days:{}};var edit=null;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function today(){return new Intl.DateTimeFormat('en-CA',{timeZone:TZ}).format(new Date(Date.now()-7*36e5))}
+function fmt(n){return 'Rp '+Math.round(n).toLocaleString('id-ID')}
+function wk(k){var d=new Date(k+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+1)%7);return d.toISOString().slice(0,10)}
+function day(k){return S.days[k]||(S.days[k]={income:0,ex:[]})}
+function calc(k){var d=S.days[k]||{income:0,ex:[]},I=d.income||0,cap=I*.5,extra=I*.3,D=0,X=0;
+d.ex.forEach(function(e){e.type=='x'?X+=e.amount:D+=e.amount});
+var over=Math.max(0,D-cap);return{I:I,cap:cap,extra:extra,D:D,X:X,over:over,left:Math.max(0,cap-D),extraLeft:extra-over-X,profit:I*.2}}
+function dstr(k,l,o){return new Intl.DateTimeFormat(l,Object.assign({timeZone:'UTC'},o)).format(new Date(k+'T12:00:00Z'))}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function render(){
+var t=today(),c=calc(t),tw=wk(t),tot=0,done=0,week=0;
+var mo={};Object.keys(S.days).forEach(function(k){var x=calc(k),m=k.slice(0,7);mo[m]=(mo[m]||0)+x.profit;tot+=x.profit;if(wk(k)<tw){done+=x.extraLeft;mo[m]+=x.extraLeft}else week+=x.extraLeft});
+var G=S.goals,cm=t.slice(0,7),mg=G.month,mSaved=mo[cm]||0,mFill=Math.min(mSaved,mg),bike=0;
+Object.keys(mo).forEach(function(m){bike+=Math.max(0,mo[m]-mg)});
+var pct=c.cap?Math.min(100,c.D/c.cap*100):0;
+var note=c.over>0?esc(fmt(c.over))+' از سقف بیشتر خرج شد و از هزینه اضافه کم شد':(c.I?'':'اول درآمد امروز را ثبت کن');
+var h='<div class="hero"><div class="row"><div><b>'+dstr(t,'fa-IR-u-ca-persian',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</b><small>'+dstr(t,'id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</small><small>درآمد: <span class="num">'+fmt(c.I)+'</span> · سقف خرج: <span class="num">'+fmt(c.cap)+'</span></small></div>'+
+'<div style="text-align:left"><small>باقی‌مانده امروز</small><div class="big">'+fmt(c.left)+'</div></div></div><div class="bar"><i style="width:'+pct+'%"></i></div><div class="note">'+note+'</div></div>';
+h+='<div class="card"><h2>درآمد روزانه (روپیه اندونزی)</h2><div class="f"><input id="inc" type="number" inputmode="numeric" value="'+(c.I||'')+'" placeholder="مثلاً 220000"><button data-a="inc">ثبت درآمد</button></div><p class="hint">روز هر روز ساعت ۷ صبح به وقت جاکارتا (WIB) عوض می‌شود. درآمد امروز را هر وقت خواستی همین‌جا تغییر بده.</p>'+
+row('خرج روزانه (٪۵۰)',fmt(c.left)+' از '+fmt(c.cap))+row('هزینه اضافه (٪۳۰)',fmt(c.extraLeft-0)+' از '+fmt(c.extra),c.extraLeft<0)+
+(c.over>0?row('کسر شده از اضافه بابت رد شدن از سقف',fmt(c.over)):'')+row('سود (٪۲۰)',fmt(c.profit))+'</div>';
+h+='<div class="card"><h2>خرج جدید</h2><div class="f"><select id="ty"><option value="d">خرج روزانه</option><option value="x">هزینه اضافه</option></select><input id="am" type="number" inputmode="numeric" placeholder="مبلغ (Rp)"></div><div class="f"><input id="nt" placeholder="بابت (اختیاری)"><button data-a="add">افزودن</button></div>';
+var ex=(S.days[t]||{ex:[]}).ex;
+if(!ex.length)h+='<p class="empty">هنوز خرجی ثبت نشده.</p>';
+ex.forEach(function(e,i){h+='<div class="r"><button class="l" data-a="del" data-i="'+i+'">حذف</button><span class="it"><span class="tag">'+(e.type=='x'?'اضافه':'روزانه')+'</span>'+esc(e.note||'—')+'</span><b>'+fmt(e.amount)+'</b></div>'});
+h+='</div>';
+h+='<div class="card"><h2>هدف‌ها</h2><p class="hint">سود و مانده اضافه هفته‌های تمام‌شده اول به ذخیره ماهانه می‌رود؛ وقتی پر شد، بقیه‌اش به خرید موتور.</p>'+goal('ذخیره ماهانه',mFill,mg)+goal('خرید موتور',bike,G.bike)+
+'<div class="f" style="margin-top:12px"><input id="gm" type="number" value="'+G.month+'" aria-label="هدف ماهانه"><input id="gb" type="number" value="'+G.bike+'" aria-label="هدف موتور"><button data-a="goals">ذخیره</button></div></div>';
+h+='<div class="card"><h2>ذخیره (سود)</h2>'+row('جمع ذخیره (سود)',fmt(tot+done))+row('سود ٪۲۰ روزها',fmt(tot))+row('مانده اضافه هفته‌های تمام‌شده',fmt(done))+row('مانده اضافه این هفته (آخر هفته به ذخیره می‌رود)',fmt(week))+'</div>';
+var past=Object.keys(S.days).filter(function(k){return k<t}).sort().reverse();
+h+='<div class="card"><h2>روزهای قبل</h2><p class="hint">برای ویرایش درآمد هر روز، روی مبلغ درآمد آن روز بزن. بعد از گذشتن اولین روز، خلاصه‌اش اینجا جمع می‌شود.</p>';
+past.forEach(function(k){var x=calc(k);
+h+='<div class="r day"><div><b>'+dstr(k,'fa-IR-u-ca-persian',{weekday:'short',day:'numeric',month:'long'})+'</b><div class="s">خرج: '+fmt(x.D+x.X)+' · اضافه مانده: <span class="'+(x.extraLeft<0?'neg':'pos')+'">'+fmt(x.extraLeft)+'</span></div></div>'+
+(edit==k?'<span class="f" style="margin:0"><input id="pi" type="number" value="'+x.I+'" style="width:110px"><button data-a="psave" data-k="'+k+'">ذخیره</button></span>':'<b data-a="pedit" data-k="'+k+'">'+fmt(x.I)+'</b>')+'</div>'});
+h+='</div>';
+h+='<div class="card"><h2>بکاپ داده</h2><p class="hint">داده‌ها فقط روی همین گوشی ذخیره می‌شوند. قبل از پاک کردن اطلاعات مرورگر یا عوض کردن گوشی، خروجی بگیر.</p><div class="f"><button data-a="export">خروجی داده</button><button data-a="import">ورود داده</button></div><input id="imp" type="file" accept="application/json" hidden></div>';
+document.getElementById('app').innerHTML=h}
+function goal(n,v,g){var p=g?Math.min(100,v/g*100):0;return '<div style="margin-top:12px"><div class="r" style="border:0;padding:0"><span>'+n+'</span><b>'+fmt(v)+' / '+fmt(g)+'</b></div><div class="bar" style="background:var(--line);margin:6px 0 0"><i style="width:'+p+'%;background:var(--gold)"></i></div></div>'}
+S.goals=S.goals||{month:3000000,bike:20000000};
+document.addEventListener('click',function(e){if(e.target.dataset.a!='goals')return;var m=+document.getElementById('gm').value,b=+document.getElementById('gb').value;if(m>0&&b>0){S.goals={month:m,bike:b};save();render()}});
+function row(a,b,neg){return '<div class="r"><span>'+a+'</span><b class="'+(neg?'neg':'')+'">'+b+'</b></div>'}
+document.addEventListener('click',function(e){var el=e.target.closest('[data-a]');if(!el)return;var a=el.dataset.a,t=today();
+if(a=='inc'){var v=+document.getElementById('inc').value;if(v>=0){day(t).income=v;save();render()}}
+else if(a=='add'){var m=+document.getElementById('am').value;if(m>0){day(t).ex.push({type:document.getElementById('ty').value,amount:m,note:document.getElementById('nt').value.trim()});save();render()}}
+else if(a=='del'){day(t).ex.splice(+el.dataset.i,1);save();render()}
+else if(a=='pedit'){edit=el.dataset.k;render()}
+else if(a=='psave'){var p=+document.getElementById('pi').value;if(p>=0){day(el.dataset.k).income=p;edit=null;save();render()}}});
+document.addEventListener('click',function(e){var a=e.target.dataset&&e.target.dataset.a;
+if(a=='export'){var b=new Blob([JSON.stringify(S)],{type:'application/json'}),l=document.createElement('a');l.href=URL.createObjectURL(b);l.download='budget-backup-'+today()+'.json';l.click()}
+if(a=='import')document.getElementById('imp').click()});
+document.addEventListener('change',function(e){if(e.target.id!='imp'||!e.target.files[0])return;var r=new FileReader();r.onload=function(){try{var d=JSON.parse(r.result);if(!d.days)throw 0;if(confirm('داده‌های فعلی با این فایل جایگزین شود؟')){S=d;S.goals=S.goals||{month:3000000,bike:20000000};save();render()}}catch(x){alert('فایل بکاپ معتبر نیست')}};r.readAsText(e.target.files[0])});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+render();setInterval(function(){if(!document.activeElement||document.activeElement.tagName!='INPUT')render()},60000);
+</script>
+<script>
+/* extras.js — پشت صحنه: تم، یادآور، پنل مدیریت مخفی، همگام‌سازی ابری */
+(function(){
+var XK='daily-budget-ext',X,tm;
+try{X=JSON.parse(localStorage.getItem(XK))}catch(e){}
+X=Object.assign({theme:'dark',p:[50,30,20],remind:false,time:'20:00',cloud:'',pin:''},X||{});
+function xs(){try{localStorage.setItem(XK,JSON.stringify(X))}catch(e){}}
+function fa(n){return Number(n).toLocaleString('fa-IR')}
+var open=false,taps=0,tapT;
+
+/* ---------- تم ---------- */
+var TH={
+dark:{n:'تیره',v:{}},
+light:{n:'روشن',v:{'--bg':'#f4f1ea','--card':'#ffffff','--line':'#e2ddd0','--ink':'#1d2433','--mute':'#6b7385','--field':'#f4f1ea','--green':'#1f9d63','--red':'#d64545'}},
+ocean:{n:'اقیانوس',v:{'--bg':'#08202e','--card':'#0f3045','--line':'#1b4a66','--gold':'#4cc9f0','--field':'#08202e'}},
+rose:{n:'گل‌سرخ',v:{'--bg':'#1d0f18','--card':'#2b1824','--line':'#44263a','--gold':'#ff8fb1','--field':'#1d0f18'}}
+};
+var st=document.createElement('style');
+st.textContent='body{background-color:var(--bg)!important}.xg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.xg input{text-align:center}.xl{font-size:13px;color:var(--mute);margin:8px 0 4px;display:block}';
+document.head.appendChild(st);
+var keys=['--bg','--card','--line','--ink','--mute','--field','--gold','--green','--red'];
+function applyTheme(){
+var r=document.documentElement,t=TH[X.theme]||TH.dark;
+keys.forEach(function(k){r.style.removeProperty(k)});
+Object.keys(t.v).forEach(function(k){r.style.setProperty(k,t.v[k])});
+r.style.colorScheme=X.theme=='light'?'light':'dark';
+var m=document.querySelector('meta[name=theme-color]');if(m)m.content=t.v['--gold']||'#e8b75c'}
+
+/* ---------- درصدها ---------- */
+calc=function(k){
+var d=S.days[k]||{income:0,ex:[]},I=d.income||0,cap=I*X.p[0]/100,extra=I*X.p[1]/100,D=0,Y=0;
+d.ex.forEach(function(e){e.type=='x'?Y+=e.amount:D+=e.amount});
+var over=Math.max(0,D-cap);
+return{I:I,cap:cap,extra:extra,D:D,X:Y,over:over,left:Math.max(0,cap-D),extraLeft:extra-over-Y,profit:I*X.p[2]/100}};
+
+/* ---------- یادآور (نوتیفیکیشن محلی) ---------- */
+function rem(){
+var L=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications;
+if(!L)return;
+L.cancel({notifications:[{id:1}]}).catch(function(){}).then(function(){
+if(!X.remind)return;
+var t=X.time.split(':');
+return L.requestPermissions().then(function(){
+return L.schedule({notifications:[{id:1,title:'خرج روزانه',body:'درآمد و خرج امروز را ثبت کردی؟',schedule:{on:{hour:+t[0],minute:+t[1]},allowWhileIdle:true}}]})})
+}).catch(function(){})}
+
+/* ---------- ابر (Firebase Realtime Database با REST) ---------- */
+function cu(){return X.cloud.replace(/\/+$/,'')+'/budget.json'}
+function up(quiet){
+if(!X.cloud)return;
+fetch(cu(),{method:'PUT',body:JSON.stringify(S)}).then(function(r){if(!r.ok)throw 0;if(!quiet)alert('در ابر ذخیره شد')}).catch(function(){if(!quiet)alert('خطا در ارتباط با ابر')})}
+function down(){
+fetch(cu()).then(function(r){return r.json()}).then(function(d){
+if(!d||!d.days)throw 0;
+if(!confirm('داده‌های گوشی با نسخه ابر جایگزین شود؟'))return;
+Object.keys(d.days).forEach(function(k){d.days[k].ex=d.days[k].ex||[]});
+S=d;S.goals=S.goals||{month:3000000,bike:20000000};save();render()
+}).catch(function(){alert('داده‌ای در ابر پیدا نشد یا ارتباط برقرار نشد')})}
+var Sv=save;
+save=function(){Sv();if(X.cloud){clearTimeout(tm);tm=setTimeout(function(){up(true)},3000)}};
+
+/* ---------- رابط ---------- */
+function card(){
+var h='<div class="card"><h2>تنظیمات</h2><span class="xl">تم</span><div class="f"><select id="xth">';
+Object.keys(TH).forEach(function(k){h+='<option value="'+k+'"'+(X.theme==k?' selected':'')+'>'+TH[k].n+'</option>'});
+h+='</select></div><span class="xl">یادآور روزانه (روی اندروید با پلاگین)</span><div class="f"><input id="xrt" type="time" value="'+X.time+'"><button data-x="rem">'+(X.remind?'خاموش کن':'روشن کن')+'</button></div>';
+if(X.remind)h+='<p class="hint">یادآور هر روز ساعت '+X.time+' فعال است.</p>';
+h+='</div>';
+if(!open)return h;
+h+='<div class="card"><h2>پنل مدیریت</h2><span class="xl">درصد تقسیم (خرج روزانه / هزینه اضافه / سود) — مجموع باید ۱۰۰ باشد</span><div class="xg"><input id="p0" type="number" value="'+X.p[0]+'"><input id="p1" type="number" value="'+X.p[1]+'"><input id="p2" type="number" value="'+X.p[2]+'"></div><div class="f" style="margin-top:10px"><button data-x="pct">ذخیره درصدها</button></div>'+
+'<span class="xl">آدرس Firebase Realtime Database</span><div class="f"><input id="xcl" dir="ltr" placeholder="https://xxx-default-rtdb.firebaseio.com" value="'+esc(X.cloud)+'"></div><div class="f"><button data-x="cl">ذخیره آدرس</button><button data-x="up">آپلود</button><button data-x="down">دانلود</button></div>'+
+'<span class="xl">رمز ورود به پنل (خالی = بدون رمز)</span><div class="f"><input id="xpin" type="password" inputmode="numeric" value="'+esc(X.pin)+'"><button data-x="pin">ذخیره</button></div>'+
+'<span class="xl">همه روزها</span>';
+var ks=Object.keys(S.days).sort().reverse();
+if(!ks.length)h+='<p class="empty">روزی ثبت نشده.</p>';
+ks.forEach(function(k){var c=calc(k);h+='<div class="r"><button class="l" data-x="rd" data-k="'+k+'">حذف روز</button><span class="num">'+k+'</span><b>'+fmt(c.I)+' · '+c.ex.length+'</b></div>'});
+h+='<div class="f" style="margin-top:12px"><button class="l" data-x="close">بستن پنل</button></div></div>';
+return h}
+function xf(){
+var a=document.getElementById('app');
+a.innerHTML=a.innerHTML.replace('(٪۵۰)','(٪'+fa(X.p[0])+')').replace('(٪۳۰)','(٪'+fa(X.p[1])+')').replace('(٪۲۰)','(٪'+fa(X.p[2])+')');
+a.insertAdjacentHTML('beforeend',card())}
+var R=render;
+render=function(){R();xf()};
+
+document.addEventListener('click',function(e){
+var b=e.target.closest&&e.target.closest('.hero b');
+if(b&&!open){taps++;clearTimeout(tapT);tapT=setTimeout(function(){taps=0},1500);
+if(taps>=5){taps=0;if(X.pin&&prompt('رمز پنل مدیریت')!=X.pin)return;open=true;render()}return}
+var el=e.target.closest('[data-x]');if(!el)return;
+var a=el.dataset.x;
+if(a=='rem'){X.remind=!X.remind;X.time=document.getElementById('xrt').value||X.time;xs();rem();render()}
+else if(a=='pct'){var p=[0,1,2].map(function(i){return +document.getElementById('p'+i).value});
+if(p.some(function(v){return !(v>=0)})||p[0]+p[1]+p[2]!=100){alert('مجموع درصدها باید دقیقاً ۱۰۰ باشد');return}
+X.p=p;xs();render()}
+else if(a=='cl'){X.cloud=document.getElementById('xcl').value.trim();xs();alert('ذخیره شد')}
+else if(a=='up'){X.cloud=document.getElementById('xcl').value.trim();xs();up()}
+else if(a=='down'){X.cloud=document.getElementById('xcl').value.trim();xs();down()}
+else if(a=='pin'){X.pin=document.getElementById('xpin').value;xs();alert('ذخیره شد')}
+else if(a=='rd'){if(confirm('روز '+el.dataset.k+' برای همیشه حذف شود؟')){delete S.days[el.dataset.k];save();render()}}
+else if(a=='close'){open=false;render()}});
+document.addEventListener('change',function(e){
+if(e.target.id=='xth'){X.theme=e.target.value;xs();applyTheme()}
+if(e.target.id=='xrt'){X.time=e.target.value||X.time;xs();if(X.remind)rem()}});
+
+applyTheme();rem();render();
+})();
+
+</script>
+</body>
+</html>
